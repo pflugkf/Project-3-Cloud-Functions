@@ -23,6 +23,7 @@ exports.createGame = functions.https.onCall(async (data, context) => {
             status: false,
             exitStatus: false,
             turn: uid,
+            winnerId: "",
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         };
 
@@ -136,6 +137,25 @@ exports.addCards = functions.https.onCall(async(data,context)=>{
         catch(err){
             throw new functions.HttpsError("aborted",err);
         }
+    }
+    else{
+        throw new functions.https.HttpsError("aborted", "Transcation Error!!");
+        return {};
+    }
+});
+
+exports.leaveGame = functions.https.onCall(async(data,context)=>{
+    const uid = isAuthenticated(data, context);
+    if (uid) {
+        const docRef = admin.firestore().collection(base_collection).doc(data.gameId);
+
+        const firebaseData = {
+            winnerId: uid,
+            status: false,
+            exitStatus: true
+        };
+
+        await docRef.update(firebaseData);
     }
     else{
         throw new functions.https.HttpsError("aborted", "Transcation Error!!");
