@@ -61,7 +61,7 @@ exports.createGame = functions.https.onCall(async (data, context) => {
 //joinGame({uid: "zCg0Trvok5egs2ZWikhEK1wngtN2", gameId: "yR6lvyf5IP8lVKRjAQKF"})
 exports.joinGame = functions.https.onCall(async (data, context) => {
     const uid = isAuthenticated(data, context);
-    if (uid) {
+        if (uid) {
         const docRef = admin.firestore().collection(base_collection).doc(data.gameId);
 
         const firebaseData = {
@@ -87,25 +87,118 @@ exports.joinGame = functions.https.onCall(async (data, context) => {
         //color
         //cardID
 exports.playCard = functions.https.onCall(async (data,context)=>{
-    // const gameID = data.gameID;
-    // const newTopCard = data.newTopCard;
-    const uid = isAuthenticated(data, context);
+
+    // const uid = isAuthenticated(data, context);
+    const uid = "zCg0Trvok5egs2ZWikhEK1wngtN2";
     if (uid) {
-        try{
-            // const gameID = "ABC";
-            // const newTopCard = {
-            //     value:"2",
-            //     color:"Red",
-            //     cardID:"card1"
-            // }
-            const cardDocRef = admin.firestore().collection("games").doc(gameID).collection("topCard").doc("current");
-            const writeResult = await cardDocRef.set(newTopCard);
-            console.log("Write Result: ",writeResult);
-            return {result: "success"};
+        // const gameID = data.gameID;
+        const gameId = "yR6lvyf5IP8lVKRjAQKF";
+
+        // const currentUserId = data.currentUserId;
+        const currentUserId = "Eqc3cZoOlyW15uNuIic05vO0nGH2";
+
+        // const playedCard = data.playedCard;
+        const playedCard = {
+            "color": "red",
+            "id": 9,
+            "value": "9",
+            "type": "num",
+        };
+        // const newTopCard = data.newTopCard;
+
+        const snapshot = await admin.firestore().collection(base_collection).doc(gameId).get();
+        var gameModel = snapshot.data();
+        if(!snapshot.empty){
+            // console.log(snapshot);
+            if(gameModel.turn == currentUserId){
+                console.log("Your Turn");
+                var flag = 1;
+                var myCards = [];
+                var oppCards = [];
+                var topCard = [];
+                var deckCards = [];
+                var myCollection;
+                var oppCollection;
+                var topColl = await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).get();;
+                var deckColl = await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).get();
+                if(currentUserId == gameModel.user1Id){
+                    flag = 0;
+                    myCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).get();
+                    oppCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).get();          
+                }
+                else{
+                    myCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).get();
+                    oppCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).get()
+                }
+                myCollection.docs.forEach((card)=>{
+                    myCards.push(card.data());
+                });
+                oppCollection.docs.forEach((card)=>{
+                    oppCards.push(card.data());
+                });
+                topColl.docs.forEach((card)=>{
+                    topCard.push(card.data());
+                });
+                deckColl.docs.forEach((card)=>{
+                    deckCards.push(card.data());
+                });
+
+                gameModel = checkCard(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+
+                // set gameModel to firebase
+                await admin.firestore().collection(base_collection).doc(gameId).update(gameModel.gameModel);
+
+                deckColl.docs.forEach((card)=>{
+                    admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(card.id.toString()).delete();
+                });
+                for(let i = 0; i < gameModel.deckCards.length; i++){
+                    await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(gameModel.deckCards[i].id.toString()).set(gameModel.deckCards[i]);
+                }
+
+                if(flag==0){
+                    myCollection.docs.forEach((card)=>{
+                        admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(card.id.toString()).delete();
+                    });
+                    for(let i = 0; i < gameModel.myCards.length; i++){
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(gameModel.myCards[i].id.toString()).set(gameModel.myCards[i]);
+                    }
+            
+                    oppCollection.docs.forEach((card)=>{
+                        admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(card.id.toString()).delete();
+                    });
+                    for(let i = 0; i < gameModel.oppCards.length; i++){
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(gameModel.oppCards[i].id.toString()).set(gameModel.oppCards[i]);
+                    }
+                }
+                else{
+                    oppCollection.docs.forEach((card)=>{
+                        admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(card.id.toString()).delete();
+                    });
+                    for(let i = 0; i < gameModel.oppCards.length; i++){
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(gameModel.oppCards[i].id.toString()).set(gameModel.oppCards[i]);
+                    }
+            
+                    myCollection.docs.forEach((card)=>{
+                        admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(card.id.toString()).delete();
+                    });
+                    for(let i = 0; i < gameModel.myCards.length; i++){
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(gameModel.myCards[i].id.toString()).update(gameModel.myCards[i]);
+                    }
+                }
+                
+                topColl.docs.forEach((card)=>{
+                    admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(card.id.toString()).delete();
+                });
+                await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(gameModel.topCard[0].id.toString()).set(gameModel.topCard[0]);
+
+                return {result: "success"};
+            }
+            else{
+                console.log("Not your turn");
+                throw new functions.https.HttpsError("aborted", "Not your turn");
+            }
         }
-        catch(err){
-            throw new functions.HttpsError("aborted",err);
-        }
+        return null;
     }
     else{
         throw new functions.https.HttpsError("aborted", "Transcation Error!!");
@@ -114,28 +207,60 @@ exports.playCard = functions.https.onCall(async (data,context)=>{
     
 });
 
-//data required
-    //gameInstance.gameID
-    //collection name (String collectionName = "hand-" + player)
-    //card
-        //value
-        //color
-        //cardID
-exports.addCards = functions.https.onCall(async(data,context)=>{
-    const uid = isAuthenticated(data, context);
-    if (uid) {
-        const gameID = data.gameID;
-        const collectionName = data.collectionName;
-        const card = data.card;
 
-        try{
-            const documentReference = admin.firestore().collection("games").doc(gameID).collection(collectionName).doc();
-            card.cardID = documentReference.id;
-            const writeResult = await documentReference.set(card);
-            return {result: documentReference.id};
-        }
-        catch(err){
-            throw new functions.HttpsError("aborted",err);
+exports.drawCards = functions.https.onCall(async (data,context)=>{
+    // const uid = isAuthenticated(data, context);
+    const uid = "zCg0Trvok5egs2ZWikhEK1wngtN2";
+    if (uid) {
+        const gameId="yR6lvyf5IP8lVKRjAQKF";
+        const currentUserId = "Eqc3cZoOlyW15uNuIic05vO0nGH2";
+        const snapshot = await admin.firestore().collection(base_collection).doc(gameId).get();
+        const gameModel = snapshot.data();
+        if(!snapshot.empty){
+            if(gameModel.turn == currentUserId){
+                var flag = 1;
+                var myCards = [];
+                var deckCards = [];
+                var myCollection;
+                var deckColl = await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).get();
+                if(currentUserId == gameModel.user1Id){
+                    flag = 0;
+                    myCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).get();
+                }
+                else{
+                    myCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).get();
+                }
+                myCollection.docs.forEach((card)=>{
+                    myCards.push(card.data());
+                });
+                deckColl.docs.forEach((card)=>{
+                    deckCards.push(card.data());
+                });
+
+                myCards.push(deckCards.pop());
+                console.log(myCards.length);
+                //set gameModel to firebase
+
+                for(let i = 0; i < deckCards.length; i++){
+                    await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(deckCards[i].id.toString()).set(deckCards[i]);
+                }
+                if(flag == 0){
+                    for(let i = 0; i < myCards.length; i++){
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(myCards[i].id.toString()).set(myCards[i]);
+                    }
+                }
+                else{
+                    for(let i = 0; i < myCards.length; i++){
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(myCards[i].id.toString()).set(myCards[i]);
+                    }
+                }
+                return {result: "success"};
+            }
+            else{
+                console.log("Not your turn");
+                throw new functions.https.HttpsError("aborted", "Not your turn");
+            }
+
         }
     }
     else{
@@ -287,4 +412,134 @@ function getArrayFromMap(cards) {
         cardsArray.push(value);
     });
     return cardsArray;
+}
+
+function checkCard(playedCard,topCard,deckCards,myCards,oppCards,gameModel){
+    const topDeck = topCard[0];
+    if(topDeck.type == "draw4"){
+        if(playedCard.type == "skip"){
+            gameModel = cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+        }
+        else if(playedCard.type == "num"){
+            gameModel = cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+        }
+        else{
+            gameModel = cardDraw4Successful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+        }
+    }
+    else if(playedCard.type == "skip"){
+        if(topDeck.color == playedCard.color){
+            //same colour skip
+            gameModel = cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+        }
+        else{
+            if(playedCard.value == topDeck.value){
+                gameModel = cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+            }
+            else{
+                //Card can not be played
+                throw new functions.https.HttpsError("aborted", "You can not play this card");
+            }
+
+        }
+    }
+    else if(playedCard.type == "num"){
+        if(playedCard.color == topDeck.color){
+            //same colour
+            gameModel = cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+        }
+        else{
+            if(playedCard.value == topDeck.value){
+                gameModel = cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+            }
+            else{
+                //Card can not be played
+                throw new functions.https.HttpsError("aborted", "You can not play this card");
+            }
+        }
+    }
+    else{
+        //draw 4
+        gameModel = cardDraw4Successful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+    }
+    return gameModel;
+}
+
+function cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel){
+    const oldTopCard = topCard.pop();
+    topCard.push(playedCard);
+    console.log("Old Card: ", oldTopCard);
+
+    var myCards = myCards.filter(function(el) { return el.id != playedCard.id; }); 
+
+    if(userCardList.isEmpty()){
+        gameModel.winnerId = gameModel.turn;
+        gameModel.exitStatus = true;
+    }
+    return {
+        "gameModel": gameModel,
+        "topCard": topCard,
+        "deckCards": deckCards,
+        "myCards": myCards,
+        "oppCards": oppCards,
+    };
+}
+
+function cardDraw4Successful(playedCard,topCard,deckCards,myCards,oppCards,gameModel){
+    const oldTopCard = topCard.pop();
+    topCard.push(playedCard);
+    console.log("Old Card: ", oldTopCard);
+
+    var myCards = myCards.filter(function(el) { return el.id != playedCard.id; });
+
+    oppCards.push(deckCards.shift());
+    oppCards.push(deckCards.shift());
+    oppCards.push(deckCards.shift());
+    oppCards.push(deckCards.shift());
+
+    if(myCards.size==0){
+        gameModel.winnerId = gameModel.turn;
+        gameModel.exitStatus = true;
+    }
+    return {
+        "gameModel": gameModel,
+        "topCard": topCard,
+        "deckCards": deckCards,
+        "myCards": myCards,
+        "oppCards": oppCards,
+    };
+}
+
+function cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel){
+
+    const oldTopCard = topCard.pop();
+    topCard.push(playedCard);
+    console.log("Old Card: ", oldTopCard);
+
+    var myCards = myCards.filter(function(el) { return el.id != playedCard.id; }); 
+
+    if(myCards.size==0){
+        gameModel.winnerId = gameModel.turn;
+        gameModel.exitStatus = true;
+    }
+    else {
+        gameModel = updateTurn(gameModel);
+    }
+    return {
+        "gameModel": gameModel,
+        "topCard": topCard,
+        "deckCards": deckCards,
+        "myCards": myCards,
+        "oppCards": oppCards,
+    };
+}
+
+function updateTurn(gameModel){
+    if(gameModel.turn == gameModel.user1Id){
+        gameModel.turn = gameModel.user2Id;
+    }
+    else{
+        gameModel.turn = gameModel.user1Id;
+    }
+    return gameModel;
 }
