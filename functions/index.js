@@ -81,35 +81,23 @@ exports.joinGame = functions.https.onCall(async (data, context) => {
 });
 
 //data required
-    //gameInstance.gameID
-    //newTopCard
+    //gameInstance.gameId
+    //currentUserId
+    //playedCard
         //value
         //color
         //cardID
 exports.playCard = functions.https.onCall(async (data,context)=>{
 
-    // const uid = isAuthenticated(data, context);
-    const uid = "zCg0Trvok5egs2ZWikhEK1wngtN2";
+    const uid = isAuthenticated(data, context);
     if (uid) {
-        // const gameID = data.gameID;
-        const gameId = "yR6lvyf5IP8lVKRjAQKF";
-
-        // const currentUserId = data.currentUserId;
-        const currentUserId = "Eqc3cZoOlyW15uNuIic05vO0nGH2";
-
-        // const playedCard = data.playedCard;
-        const playedCard = {
-            "color": "red",
-            "id": 9,
-            "value": "9",
-            "type": "num",
-        };
-        // const newTopCard = data.newTopCard;
+        const gameId = data.gameID;
+        const currentUserId = data.currentUserId;
+        const playedCard = data.playedCard;
 
         const snapshot = await admin.firestore().collection(base_collection).doc(gameId).get();
         var gameModel = snapshot.data();
         if(!snapshot.empty){
-            // console.log(snapshot);
             if(gameModel.turn == currentUserId){
                 console.log("Your Turn");
                 var flag = 1;
@@ -207,13 +195,14 @@ exports.playCard = functions.https.onCall(async (data,context)=>{
     
 });
 
-
+//data required
+    //gameInstance.gameId
+    //currentUserId
 exports.drawCards = functions.https.onCall(async (data,context)=>{
-    // const uid = isAuthenticated(data, context);
-    const uid = "zCg0Trvok5egs2ZWikhEK1wngtN2";
+    const uid = isAuthenticated(data, context);
     if (uid) {
-        const gameId="yR6lvyf5IP8lVKRjAQKF";
-        const currentUserId = "Eqc3cZoOlyW15uNuIic05vO0nGH2";
+        const gameId = data.gameId;
+        const currentUserId = data.currentUserId;
         const snapshot = await admin.firestore().collection(base_collection).doc(gameId).get();
         const gameModel = snapshot.data();
         if(!snapshot.empty){
