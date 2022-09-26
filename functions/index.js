@@ -91,9 +91,9 @@ exports.playCard = functions.https.onCall(async (data,context)=>{
 
     const uid = isAuthenticated(data, context);
     if (uid) {
-        const gameId = data.gameID;
+        const gameId = data.gameId;
         const currentUserId = data.currentUserId;
-        const playedCard = data.playedCard;
+        const playedCard = data.card;
 
         const snapshot = await admin.firestore().collection(base_collection).doc(gameId).get();
         var gameModel = snapshot.data();
@@ -279,8 +279,8 @@ exports.leaveGame = functions.https.onCall(async(data,context)=>{
 
 function isAuthenticated(data, context) {
     if (DEBUG) {
-      if (data.uid) {
-        return data.uid;
+      if (data.currentUserId) {
+        return data.currentUserId;
       }
       return undefined;
     } else {
