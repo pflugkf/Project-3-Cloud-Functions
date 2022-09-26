@@ -92,7 +92,7 @@ exports.playCard = functions.https.onCall(async (data,context)=>{
     const uid = isAuthenticated(data, context);
     if (uid) {
         const gameId = data.gameId;
-        const currentUserId = data.currentUserId;
+        const currentUserId = data.uid;
         const playedCard = data.card;
 
         const snapshot = await admin.firestore().collection(base_collection).doc(gameId).get();
@@ -202,7 +202,7 @@ exports.drawCards = functions.https.onCall(async (data,context)=>{
     const uid = isAuthenticated(data, context);
     if (uid) {
         const gameId = data.gameId;
-        const currentUserId = data.currentUserId;
+        const currentUserId = data.uid;
         const snapshot = await admin.firestore().collection(base_collection).doc(gameId).get();
         const gameModel = snapshot.data();
         if(!snapshot.empty){
@@ -279,8 +279,8 @@ exports.leaveGame = functions.https.onCall(async(data,context)=>{
 
 function isAuthenticated(data, context) {
     if (DEBUG) {
-      if (data.currentUserId) {
-        return data.currentUserId;
+      if (data.uid) {
+        return data.uid;
       }
       return undefined;
     } else {
