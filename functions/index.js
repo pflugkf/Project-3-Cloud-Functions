@@ -90,17 +90,26 @@ exports.joinGame = functions.https.onCall(async (data, context) => {
 exports.playCard = functions.https.onCall(async (data,context)=>{
 
     const uid = isAuthenticated(data, context);
+    // const uid = "qSGojlsFe6QIHC5vCNxpa8enXUh2";
     if (uid) {
         const gameId = data.gameId;
+        // const gameId = "VQYnT9u6PpAI8PFwUZ0k"
         const currentUserId = data.uid;
+        // const currentUserId = "qSGojlsFe6QIHC5vCNxpa8enXUh2";
         const playedCard = data.card;
+        // const playedCard = {
+        //     value: "8",
+        //     id:8,
+        //     type:"num",
+        //     color:"red",
+        // }
 
         const snapshot = await admin.firestore().collection(base_collection).doc(gameId).get();
         var gameModel = snapshot.data();
         if(!snapshot.empty){
             if(gameModel.turn == currentUserId){
                 console.log("Your Turn");
-                var flag = 1;
+                let flag = 1;
                 var myCards = [];
                 var oppCards = [];
                 var topCard = [];
@@ -131,53 +140,71 @@ exports.playCard = functions.https.onCall(async (data,context)=>{
                     deckCards.push(card.data());
                 });
 
+                console.log("before check Card");
+                console.log("my cards");
+                myCards.forEach((card)=>{
+                    console.log(card);
+                });
+                console.log("opp cards");
+                oppCards.forEach((card)=>{
+                    console.log(card);
+                });
                 gameModel = checkCard(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+                console.log("Game Model");
+                console.log(gameModel);
 
                 // set gameModel to firebase
                 await admin.firestore().collection(base_collection).doc(gameId).update(gameModel.gameModel);
 
-                deckColl.docs.forEach((card)=>{
-                    admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(card.id.toString()).delete();
+                deckColl.docs.forEach(async (card)=>{
+                    await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(card.id.toString()).delete();
                 });
                 for(let i = 0; i < gameModel.deckCards.length; i++){
                     await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(gameModel.deckCards[i].id.toString()).set(gameModel.deckCards[i]);
                 }
-
+                
+                topColl.docs.forEach(async (card)=>{
+                    await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(card.id.toString()).delete();
+                });
+                
+                await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(gameModel.topCard[0].id.toString()).set(gameModel.topCard[0]);
+                
                 if(flag==0){
-                    myCollection.docs.forEach((card)=>{
-                        admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(card.id.toString()).delete();
+                    console.log("flag =0");
+                    console.log("Size my Cards" , gameModel.myCards.length);
+                    console.log("Size opp Cards" , gameModel.oppCards.length);
+                    myCollection.docs.forEach(async (card)=>{
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(card.id.toString()).delete();
                     });
                     for(let i = 0; i < gameModel.myCards.length; i++){
                         await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(gameModel.myCards[i].id.toString()).set(gameModel.myCards[i]);
                     }
             
-                    oppCollection.docs.forEach((card)=>{
-                        admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(card.id.toString()).delete();
+                    oppCollection.docs.forEach(async (card)=>{
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(card.id.toString()).delete();
                     });
                     for(let i = 0; i < gameModel.oppCards.length; i++){
                         await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(gameModel.oppCards[i].id.toString()).set(gameModel.oppCards[i]);
                     }
                 }
                 else{
-                    oppCollection.docs.forEach((card)=>{
-                        admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(card.id.toString()).delete();
+                    console.log("flag =1");
+                    console.log("Size my Cards" , gameModel.myCards.length);
+                    console.log("Size opp Cards" , gameModel.oppCards.length);
+                    oppCollection.docs.forEach(async (card)=>{
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(card.id.toString()).delete();
                     });
                     for(let i = 0; i < gameModel.oppCards.length; i++){
                         await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(gameModel.oppCards[i].id.toString()).set(gameModel.oppCards[i]);
                     }
             
-                    myCollection.docs.forEach((card)=>{
-                        admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(card.id.toString()).delete();
+                    myCollection.docs.forEach(async (card)=>{
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(card.id.toString()).delete();
                     });
                     for(let i = 0; i < gameModel.myCards.length; i++){
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(gameModel.myCards[i].id.toString()).update(gameModel.myCards[i]);
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(gameModel.myCards[i].id.toString()).set(gameModel.myCards[i]);
                     }
                 }
-                
-                topColl.docs.forEach((card)=>{
-                    admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(card.id.toString()).delete();
-                });
-                await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(gameModel.topCard[0].id.toString()).set(gameModel.topCard[0]);
 
                 return {result: "success"};
             }
@@ -186,7 +213,7 @@ exports.playCard = functions.https.onCall(async (data,context)=>{
                 throw new functions.https.HttpsError("aborted", "Not your turn");
             }
         }
-        return null;
+        throw new functions.https.HttpsError("aborted", "Error Occured");
     }
     else{
         throw new functions.https.HttpsError("aborted", "Transcation Error!!");
@@ -230,6 +257,9 @@ exports.drawCards = functions.https.onCall(async (data,context)=>{
                 console.log(myCards.length);
                 //set gameModel to firebase
 
+                deckColl.docs.forEach(async (card)=>{
+                    await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(card.id.toString()).delete();
+                });
                 for(let i = 0; i < deckCards.length; i++){
                     await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(deckCards[i].id.toString()).set(deckCards[i]);
                 }
@@ -451,6 +481,15 @@ function checkCard(playedCard,topCard,deckCards,myCards,oppCards,gameModel){
         //draw 4
         gameModel = cardDraw4Successful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
     }
+    // console.log("In check Card");
+    // console.log("my cards");
+    // myCards.forEach((card)=>{
+    //     console.log(card);
+    // });
+    // console.log("opp cards");
+    // oppCards.forEach((card)=>{
+    //     console.log(card);
+    // });
     return gameModel;
 }
 
@@ -465,6 +504,15 @@ function cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameMo
         gameModel.winnerId = gameModel.turn;
         gameModel.exitStatus = true;
     }
+    // console.log("After check Card");
+    // console.log("my cards");
+    // myCards.forEach((card)=>{
+    //     console.log(card);
+    // });
+    // console.log("opp cards");
+    // oppCards.forEach((card)=>{
+    //     console.log(card);
+    // });
     return {
         "gameModel": gameModel,
         "topCard": topCard,
@@ -490,6 +538,15 @@ function cardDraw4Successful(playedCard,topCard,deckCards,myCards,oppCards,gameM
         gameModel.winnerId = gameModel.turn;
         gameModel.exitStatus = true;
     }
+    // console.log("After check Card");
+    // console.log("my cards");
+    // myCards.forEach((card)=>{
+    //     console.log(card);
+    // });
+    // console.log("opp cards");
+    // oppCards.forEach((card)=>{
+    //     console.log(card);
+    // });
     return {
         "gameModel": gameModel,
         "topCard": topCard,
@@ -514,6 +571,15 @@ function cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameMod
     else {
         gameModel = updateTurn(gameModel);
     }
+    // console.log("After check Card");
+    // console.log("my cards");
+    // myCards.forEach((card)=>{
+    //     console.log(card);
+    // });
+    // console.log("opp cards");
+    // oppCards.forEach((card)=>{
+    //     console.log(card);
+    // });
     return {
         "gameModel": gameModel,
         "topCard": topCard,
