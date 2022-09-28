@@ -91,15 +91,16 @@ exports.playCard = functions.https.onCall(async (data,context)=>{
 
     const uid = isAuthenticated(data, context);
     // const uid = "qSGojlsFe6QIHC5vCNxpa8enXUh2";
+    // lAHXdvzoSsZK8QytLB7f3HPSCiB3
     if (uid) {
         const gameId = data.gameId;
-        // const gameId = "VQYnT9u6PpAI8PFwUZ0k"
+        // const gameId = "pFeeWbMhvY4MLUPh57Qz"
         const currentUserId = data.uid;
-        // const currentUserId = "qSGojlsFe6QIHC5vCNxpa8enXUh2";
+        // const currentUserId = "lAHXdvzoSsZK8QytLB7f3HPSCiB3";
         const playedCard = data.card;
         // const playedCard = {
-        //     value: "8",
-        //     id:8,
+        //     value: "1",
+        //     id:1,
         //     type:"num",
         //     color:"red",
         // }
@@ -109,103 +110,74 @@ exports.playCard = functions.https.onCall(async (data,context)=>{
         if(!snapshot.empty){
             if(gameModel.turn == currentUserId){
                 console.log("Your Turn");
-                let flag = 1;
-                var myCards = [];
-                var oppCards = [];
-                var topCard = [];
-                var deckCards = [];
-                var myCollection;
-                var oppCollection;
-                var topColl = await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).get();;
-                var deckColl = await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).get();
+                let flag = 1;               
                 if(currentUserId == gameModel.user1Id){
                     flag = 0;
-                    myCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).get();
-                    oppCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).get();          
                 }
-                else{
-                    myCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).get();
-                    oppCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).get()
-                }
-                myCollection.docs.forEach((card)=>{
-                    myCards.push(card.data());
-                });
-                oppCollection.docs.forEach((card)=>{
-                    oppCards.push(card.data());
-                });
+                var topCard = [];
+                var topColl = await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).get();
                 topColl.docs.forEach((card)=>{
                     topCard.push(card.data());
                 });
-                deckColl.docs.forEach((card)=>{
-                    deckCards.push(card.data());
-                });
-
-                console.log("before check Card");
-                console.log("my cards");
-                myCards.forEach((card)=>{
-                    console.log(card);
-                });
-                console.log("opp cards");
-                oppCards.forEach((card)=>{
-                    console.log(card);
-                });
-                gameModel = checkCard(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
-                console.log("Game Model");
-                console.log(gameModel);
-
-                // set gameModel to firebase
-                await admin.firestore().collection(base_collection).doc(gameId).update(gameModel.gameModel);
-
-                deckColl.docs.forEach(async (card)=>{
-                    await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(card.id.toString()).delete();
-                });
-                for(let i = 0; i < gameModel.deckCards.length; i++){
-                    await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(gameModel.deckCards[i].id.toString()).set(gameModel.deckCards[i]);
-                }
-                
-                topColl.docs.forEach(async (card)=>{
-                    await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(card.id.toString()).delete();
-                });
-                
-                await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(gameModel.topCard[0].id.toString()).set(gameModel.topCard[0]);
-                
-                if(flag==0){
-                    console.log("flag =0");
-                    console.log("Size my Cards" , gameModel.myCards.length);
-                    console.log("Size opp Cards" , gameModel.oppCards.length);
-                    myCollection.docs.forEach(async (card)=>{
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(card.id.toString()).delete();
-                    });
-                    for(let i = 0; i < gameModel.myCards.length; i++){
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(gameModel.myCards[i].id.toString()).set(gameModel.myCards[i]);
+                const topDeck = topCard[0];
+                console.log("top card", topDeck);
+                if(topDeck.type == "draw4"){
+                    console.log('on draw4 ');
+                    if(playedCard.type == "skip"){
+                        updateResult = cardSkipSuccessful(playedCard,flag,gameModel,gameId);
                     }
-            
-                    oppCollection.docs.forEach(async (card)=>{
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(card.id.toString()).delete();
-                    });
-                    for(let i = 0; i < gameModel.oppCards.length; i++){
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(gameModel.oppCards[i].id.toString()).set(gameModel.oppCards[i]);
+                    else if(playedCard.type == "num"){
+                        updateResult = cardNumSuccessful(playedCard,flag,gameModel,gameId);
+                    }
+                    else{
+                        updateResult = cardDraw4Successful(playedCard,flag,gameModel,gameId);
+                    }
+                }
+                else if(playedCard.type == "skip"){
+                    console.log('skip');
+                    if(topDeck.color == playedCard.color){
+                        //same colour skip
+                        updateResult = cardSkipSuccessful(playedCard,flag,gameModel,gameId);
+                    }
+                    else{
+                        if(playedCard.value == topDeck.value){
+                            updateResult = cardSkipSuccessful(playedCard,flag,gameModel,gameId);
+                        }
+                        else{
+                            //Card can not be played
+                            throw new functions.https.HttpsError("aborted", "You can not play this card");
+                        }
+
+                    }
+                }
+                else if(playedCard.type == "num"){
+                    console.log('num');
+                    if(playedCard.color == topDeck.color){
+                        //same colour
+                        updateResult = cardNumSuccessful(playedCard,flag,gameModel,gameId);
+                    }
+                    else{
+                        if(playedCard.value == topDeck.value){
+                            updateResult = cardNumSuccessful(playedCard,flag,gameModel,gameId);
+                        }
+                        else{
+                            //Card can not be played
+                            throw new functions.https.HttpsError("aborted", "You can not play this card");
+                        }
                     }
                 }
                 else{
-                    console.log("flag =1");
-                    console.log("Size my Cards" , gameModel.myCards.length);
-                    console.log("Size opp Cards" , gameModel.oppCards.length);
-                    oppCollection.docs.forEach(async (card)=>{
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(card.id.toString()).delete();
-                    });
-                    for(let i = 0; i < gameModel.oppCards.length; i++){
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(gameModel.oppCards[i].id.toString()).set(gameModel.oppCards[i]);
-                    }
-            
-                    myCollection.docs.forEach(async (card)=>{
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(card.id.toString()).delete();
-                    });
-                    for(let i = 0; i < gameModel.myCards.length; i++){
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(gameModel.myCards[i].id.toString()).set(gameModel.myCards[i]);
-                    }
+                    console.log('draw 4');
+                    //draw 4
+                    updateResult = cardDraw4Successful(playedCard,flag,gameModel,gameId);
                 }
-
+                // console.log(updateResult);
+                // if(updateResult.result == "success"){
+                //     return {result: "success"};
+                // }
+                // else{
+                //     throw new functions.https.HttpsError("aborted", "Error Occured");
+                // }
                 return {result: "success"};
             }
             else{
@@ -227,50 +199,53 @@ exports.playCard = functions.https.onCall(async (data,context)=>{
     //currentUserId
 exports.drawCards = functions.https.onCall(async (data,context)=>{
     const uid = isAuthenticated(data, context);
+    // const uid = "qSGojlsFe6QIHC5vCNxpa8enXUh2";
+    // lAHXdvzoSsZK8QytLB7f3HPSCiB3
     if (uid) {
         const gameId = data.gameId;
         const currentUserId = data.uid;
+        // const gameId = "pFeeWbMhvY4MLUPh57Qz"
+        // const currentUserId = "lAHXdvzoSsZK8QytLB7f3HPSCiB3";
         const snapshot = await admin.firestore().collection(base_collection).doc(gameId).get();
         const gameModel = snapshot.data();
         if(!snapshot.empty){
+            let flag = 1;               
+            if(currentUserId == gameModel.user1Id){
+                flag = 0;
+            }
             if(gameModel.turn == currentUserId){
-                var flag = 1;
-                var myCards = [];
-                var deckCards = [];
-                var myCollection;
+                //remove 1 card from deck
+                //add 1 card to user card
+
                 var deckColl = await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).get();
-                if(currentUserId == gameModel.user1Id){
-                    flag = 0;
-                    myCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).get();
+                var cardsToAdd = [];
+                var deckSize;
+                await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).get().then(function(querySnapshot){
+                    deckSize = querySnapshot.size;
+                });
+                if(deckSize > 1){
+                    var x=0;
+                    deckColl.docs.every((card)=>{
+                        cardsToAdd.push(card.data());
+                        x++;
+                        if(x>0){
+                            return false;
+                        }
+                        return true;
+                    });
+                    cardsToAdd.forEach(async (card)=>{
+                        await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(card.id.toString()).delete();
+                        if(flag == 0){
+                            await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(card.id.toString()).set(card);
+                        }
+                        else{
+                            await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(card.id.toString()).set(card);
+                        }
+                    });
                 }
                 else{
-                    myCollection = await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).get();
-                }
-                myCollection.docs.forEach((card)=>{
-                    myCards.push(card.data());
-                });
-                deckColl.docs.forEach((card)=>{
-                    deckCards.push(card.data());
-                });
-
-                myCards.push(deckCards.pop());
-                console.log(myCards.length);
-                //set gameModel to firebase
-
-                deckColl.docs.forEach(async (card)=>{
-                    await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(card.id.toString()).delete();
-                });
-                for(let i = 0; i < deckCards.length; i++){
-                    await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(deckCards[i].id.toString()).set(deckCards[i]);
-                }
-                if(flag == 0){
-                    for(let i = 0; i < myCards.length; i++){
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(myCards[i].id.toString()).set(myCards[i]);
-                    }
-                }
-                else{
-                    for(let i = 0; i < myCards.length; i++){
-                        await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(myCards[i].id.toString()).set(myCards[i]);
+                    return{
+                        "result": "Not enough cards in deck",
                     }
                 }
                 return {result: "success"};
@@ -279,7 +254,6 @@ exports.drawCards = functions.https.onCall(async (data,context)=>{
                 console.log("Not your turn");
                 throw new functions.https.HttpsError("aborted", "Not your turn");
             }
-
         }
     }
     else{
@@ -433,160 +407,267 @@ function getArrayFromMap(cards) {
     return cardsArray;
 }
 
-function checkCard(playedCard,topCard,deckCards,myCards,oppCards,gameModel){
-    const topDeck = topCard[0];
-    if(topDeck.type == "draw4"){
-        if(playedCard.type == "skip"){
-            gameModel = cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
-        }
-        else if(playedCard.type == "num"){
-            gameModel = cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+// function checkCard(playedCard,topCard,deckCards,myCards,oppCards,gameModel){
+//     const topDeck = topCard[0];
+//     if(topDeck.type == "draw4"){
+//         if(playedCard.type == "skip"){
+//             gameModel = cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+//         }
+//         else if(playedCard.type == "num"){
+//             gameModel = cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+//         }
+//         else{
+//             gameModel = cardDraw4Successful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+//         }
+//     }
+//     else if(playedCard.type == "skip"){
+//         if(topDeck.color == playedCard.color){
+//             //same colour skip
+//             gameModel = cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+//         }
+//         else{
+//             if(playedCard.value == topDeck.value){
+//                 gameModel = cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+//             }
+//             else{
+//                 //Card can not be played
+//                 throw new functions.https.HttpsError("aborted", "You can not play this card");
+//             }
+
+//         }
+//     }
+//     else if(playedCard.type == "num"){
+//         if(playedCard.color == topDeck.color){
+//             //same colour
+//             gameModel = cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+//         }
+//         else{
+//             if(playedCard.value == topDeck.value){
+//                 gameModel = cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+//             }
+//             else{
+//                 //Card can not be played
+//                 throw new functions.https.HttpsError("aborted", "You can not play this card");
+//             }
+//         }
+//     }
+//     else{
+//         //draw 4
+//         gameModel = cardDraw4Successful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+//     }
+//     // console.log("In check Card");
+//     // console.log("my cards");
+//     // myCards.forEach((card)=>{
+//     //     console.log(card);
+//     // });
+//     // console.log("opp cards");
+//     // oppCards.forEach((card)=>{
+//     //     console.log(card);
+//     // });
+//     return gameModel;
+// }
+
+async function cardSkipSuccessful(playedCard,flag,gameModel,gameId){
+    // data required
+    // playedCard, flag, gameModel
+
+    try{
+        var topColl = await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).get();
+    
+        //Delete played card from user deck
+        if(flag==0){
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(playedCard.id.toString()).delete();
         }
         else{
-            gameModel = cardDraw4Successful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(playedCard.id.toString()).delete();
         }
-    }
-    else if(playedCard.type == "skip"){
-        if(topDeck.color == playedCard.color){
-            //same colour skip
-            gameModel = cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
-        }
-        else{
-            if(playedCard.value == topDeck.value){
-                gameModel = cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
-            }
-            else{
-                //Card can not be played
-                throw new functions.https.HttpsError("aborted", "You can not play this card");
-            }
 
-        }
-    }
-    else if(playedCard.type == "num"){
-        if(playedCard.color == topDeck.color){
-            //same colour
-            gameModel = cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+
+        //Delete top card from top deck
+        //add played card to top deck
+        topColl.docs.forEach(async (card)=>{
+            await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(card.id.toString()).delete();
+        });
+        await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(playedCard.id.toString()).set(playedCard);
+        
+        
+        //check if user deck is empty
+        var size;
+        if(flag == 0){
+            // user1DeckCollection
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).get().then(function(querySnapshot){
+                size = querySnapshot.size;
+            });
         }
         else{
-            if(playedCard.value == topDeck.value){
-                gameModel = cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
-            }
-            else{
-                //Card can not be played
-                throw new functions.https.HttpsError("aborted", "You can not play this card");
-            }
+            // user2DeckCollection
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).get().then(function(querySnapshot){
+                size = querySnapshot.size;
+            });
         }
+        console.log("Size: ", size);
+        if(size == 0){
+            gameModel.winnerId = gameModel.turn;
+            gameModel.exitStatus = true;
+        }
+
+        await admin.firestore().collection(base_collection).doc(gameId).update(gameModel);
+
+        return {
+            "result": "success",
+        };
     }
-    else{
-        //draw 4
-        gameModel = cardDraw4Successful(playedCard,topCard,deckCards,myCards,oppCards,gameModel);
+    
+    catch(err){
+        throw new functions.https.HttpsError("aborted", err);
     }
-    // console.log("In check Card");
-    // console.log("my cards");
-    // myCards.forEach((card)=>{
-    //     console.log(card);
-    // });
-    // console.log("opp cards");
-    // oppCards.forEach((card)=>{
-    //     console.log(card);
-    // });
-    return gameModel;
 }
 
-function cardSkipSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel){
-    const oldTopCard = topCard.pop();
-    topCard.push(playedCard);
-    console.log("Old Card: ", oldTopCard);
+async function cardDraw4Successful(playedCard,flag,gameModel,gameId){
+    // data required
+    // playedCard, flag, gameModel
 
-    var myCards = myCards.filter(function(el) { return el.id != playedCard.id; }); 
-
-    if(userCardList.isEmpty()){
-        gameModel.winnerId = gameModel.turn;
-        gameModel.exitStatus = true;
+    try{
+        var topColl = await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).get();
+        var deckColl = await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).get();
+    
+        //Delete played card from user deck
+        if(flag==0){
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(playedCard.id.toString()).delete();
+        }
+        else{
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(playedCard.id.toString()).delete();
+        }
+     
+        //Delete top card from top deck
+        //add played card to top deck
+        topColl.docs.forEach(async (card)=>{
+            await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(card.id.toString()).delete();
+        });
+        await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(playedCard.id.toString()).set(playedCard);
+    
+    
+        //pop 4 cards from deck
+        //add these 4 cards to other player deck
+        var deckColl = await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).get();
+        var cardsToAdd = []
+        var deckSize;
+        await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).get().then(function(querySnapshot){
+            deckSize = querySnapshot.size;
+        });
+        if(deckSize > 4){
+            var x=0;
+            deckColl.docs.every((card)=>{
+                cardsToAdd.push(card.data());
+                x++;
+                if(x>3){
+                    return false;
+                }
+                return true;
+            });
+            cardsToAdd.forEach(async (card)=>{
+                await admin.firestore().collection(base_collection).doc(gameId).collection(deckCollection).doc(card.id.toString()).delete();
+                if(flag == 0){
+                    await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(card.id.toString()).set(card);
+                }
+                else{
+                    await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(card.id.toString()).set(card);
+                }
+            });
+        }
+        else{
+            throw new functions.https.HttpsError("aborted", "Not enough cards in deck");
+        }
+        
+        
+        //check if user deck is empty
+        var size;
+        if(flag == 0){
+            // user1DeckCollection
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).get().then(function(querySnapshot){
+                size = querySnapshot.size;
+            });
+        }
+        else{
+            // user2DeckCollection
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).get().then(function(querySnapshot){
+                size = querySnapshot.size;
+            });
+        }
+        console.log("Size: ", size);
+        if(size==0){
+            gameModel.winnerId = gameModel.turn;
+            gameModel.exitStatus = true;
+        }
+        await admin.firestore().collection(base_collection).doc(gameId).update(gameModel);
+    
+        return {
+            "result": "success",
+        };
     }
-    // console.log("After check Card");
-    // console.log("my cards");
-    // myCards.forEach((card)=>{
-    //     console.log(card);
-    // });
-    // console.log("opp cards");
-    // oppCards.forEach((card)=>{
-    //     console.log(card);
-    // });
-    return {
-        "gameModel": gameModel,
-        "topCard": topCard,
-        "deckCards": deckCards,
-        "myCards": myCards,
-        "oppCards": oppCards,
-    };
+    catch(err){
+        throw new functions.https.HttpsError("aborted", err);
+    }
 }
 
-function cardDraw4Successful(playedCard,topCard,deckCards,myCards,oppCards,gameModel){
-    const oldTopCard = topCard.pop();
-    topCard.push(playedCard);
-    console.log("Old Card: ", oldTopCard);
+async function cardNumSuccessful(playedCard,flag,gameModel,gameId){
+    // data required
+    // playedCard, flag, gameModel
 
-    var myCards = myCards.filter(function(el) { return el.id != playedCard.id; });
+    try{
+        var topColl = await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).get();
 
-    oppCards.push(deckCards.shift());
-    oppCards.push(deckCards.shift());
-    oppCards.push(deckCards.shift());
-    oppCards.push(deckCards.shift());
-
-    if(myCards.size==0){
-        gameModel.winnerId = gameModel.turn;
-        gameModel.exitStatus = true;
+        //Delete played card from user deck
+        if(flag==0){
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).doc(playedCard.id.toString()).delete();
+            // await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).
+        }
+        else{
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).doc(playedCard.id.toString()).delete();
+        }
+        
+        //Delete top card from top deck
+        //add played card to top deck
+        topColl.docs.forEach(async (card)=>{
+            await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(card.id.toString()).delete();
+        });
+        await admin.firestore().collection(base_collection).doc(gameId).collection(topCollection).doc(playedCard.id.toString()).set(playedCard);
+    
+    
+        //update turn
+        //check if user deck is empty
+        var size;
+        if(flag == 0){
+            // user1DeckCollection
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user1DeckCollection).get().then(function(querySnapshot){
+                size = querySnapshot.size;
+            });
+        }
+        else{
+            // user2DeckCollection
+            await admin.firestore().collection(base_collection).doc(gameId).collection(user2DeckCollection).get().then(function(querySnapshot){
+                size = querySnapshot.size;
+            });
+        }
+        console.log("Size: ", size);
+        if(size==0){
+            gameModel.winnerId = gameModel.turn;
+            gameModel.exitStatus = true;
+        }
+        else {
+            gameModel = updateTurn(gameModel);
+        }
+    
+        await admin.firestore().collection(base_collection).doc(gameId).update(gameModel);
+    
+        return {
+            "result": "success",
+        };
     }
-    // console.log("After check Card");
-    // console.log("my cards");
-    // myCards.forEach((card)=>{
-    //     console.log(card);
-    // });
-    // console.log("opp cards");
-    // oppCards.forEach((card)=>{
-    //     console.log(card);
-    // });
-    return {
-        "gameModel": gameModel,
-        "topCard": topCard,
-        "deckCards": deckCards,
-        "myCards": myCards,
-        "oppCards": oppCards,
-    };
-}
-
-function cardNumSuccessful(playedCard,topCard,deckCards,myCards,oppCards,gameModel){
-
-    const oldTopCard = topCard.pop();
-    topCard.push(playedCard);
-    console.log("Old Card: ", oldTopCard);
-
-    var myCards = myCards.filter(function(el) { return el.id != playedCard.id; }); 
-
-    if(myCards.size==0){
-        gameModel.winnerId = gameModel.turn;
-        gameModel.exitStatus = true;
+    catch(err){
+        throw new functions.https.HttpsError("aborted", err);
     }
-    else {
-        gameModel = updateTurn(gameModel);
-    }
-    // console.log("After check Card");
-    // console.log("my cards");
-    // myCards.forEach((card)=>{
-    //     console.log(card);
-    // });
-    // console.log("opp cards");
-    // oppCards.forEach((card)=>{
-    //     console.log(card);
-    // });
-    return {
-        "gameModel": gameModel,
-        "topCard": topCard,
-        "deckCards": deckCards,
-        "myCards": myCards,
-        "oppCards": oppCards,
-    };
+    
 }
 
 function updateTurn(gameModel){
