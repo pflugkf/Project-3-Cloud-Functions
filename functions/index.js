@@ -265,10 +265,15 @@ exports.drawCards = functions.https.onCall(async (data,context)=>{
 exports.leaveGame = functions.https.onCall(async(data,context)=>{
     const uid = isAuthenticated(data, context);
     if (uid) {
-        const docRef = admin.firestore().collection(base_collection).doc(data.gameId);
-
+        const docRef = await admin.firestore().collection(base_collection).doc(data.gameId);
+        const snapshot = await admin.firestore().collection(base_collection).doc(gameId).get();
+        var gameModel = snapshot.data();
+        var user = gameModel.user1Id;
+        if(gameModel.user1Id == uid){
+            user = gameModel.user2Id;
+        }
         const firebaseData = {
-            winnerId: uid,
+            winnerId: user,
             status: false,
             exitStatus: true
         };
